@@ -9,8 +9,9 @@ import android.content.Intent;
  *
  * The wireless-CarPlay hotspot window is short, so after a reboot the bridge
  * MUST come up on its own and dial immediately (persist.cpbridge.peer_mac
- * survives the reboot and the dialer reads it live).  The legacy "enabled"
- * preference is only logged now, not used as a gate.
+ * survives the reboot and the dialer reads it live).  It restarts only if the
+ * "enabled" preference is set: BridgeService.onCreate sets it, an explicit stop
+ * clears it.
  */
 public final class BootReceiver extends BroadcastReceiver {
 

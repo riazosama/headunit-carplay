@@ -4,7 +4,7 @@ Turn on Apple CarPlay that your Android head unit already shipped with. Wired ov
 
 > Long-form write-up (the narrative version of the repo README). The condensed front page is [README.md](../README.md).
 
-**The story:** [link to your X thread]
+**The story:** [the X thread](https://x.com/mriazosama/status/2114649520160276507)
 
 My Honda City's aftermarket screen never showed CarPlay. It turned out the unit (an Autochips AC8257 board) already had Apple's CarPlay software and a genuine Apple authentication chip inside. The vendor just shipped it half-finished and switched off. A coding assistant found it, and over one weekend wired CarPlay was working properly, with sound through the car speakers, opening by itself when I plug in.
 
@@ -151,7 +151,7 @@ Then plug in your iPhone. CarPlay comes up, with touch, Siri, and sound through 
 
 ## Optional — clean up what CarPlay replaces
 
-With CarPlay running, the unit's own maps and mirroring apps are dead weight.
+With CarPlay running, the unit's own maps and mirroring apps are dead weight. Maps isn't something the unit needs to run, so removing it for your user doesn't break the rule above, and `restore-wired.sh` puts it back.
 
 ```bash
 adb shell pm uninstall -k --user 0 com.google.android.apps.maps   # keeps data; restore with:
@@ -172,7 +172,7 @@ Read all of this before you touch the unit. The wireless path has one genuinely 
 |---|---|---|
 | Wireless CarPlay screen | **Works** | AirPlay session starts, screen stream renders in the CarPlay screen app |
 | Touch | **Works** | Touch rides the same vendor rendering path as wired |
-| Auto-connect at car start | **Works** | Up to about a minute after boot |
+| Auto-connect at car start | **Works** | Up to about a minute after boot, as long as `authd` is still running. After a full reboot, run `authd spawn` again (Step 5) |
 | Audio over wireless | **Does not work** | Audio stays on the iPhone. Root-caused, decoder built and tested in isolation, not verified in a live session — see **Audio over wireless** |
 | Other units | Untested | The four values in **The four things that must match** are the usual reasons it silently fails |
 
@@ -281,12 +281,14 @@ Then, on the unit, read the values that only exist in wireless mode: the hotspot
 | AirPlay source version | The version the running receiver reports (mine was `320.17.3`). Watch the receiver's log or its Bonjour record. | Session request |
 | AirPlay port | 7000 | Session request |
 
-For the keychain: it is root-only, so pull it with root, print it with `plutil`, and copy only the public half.
+For the keychain: it is root-only, so pull it with root and extract only the public half. The item holds your private key too, so don't print it whole.
 
 ```bash
 adb root
 adb pull /data/vendor/carplay/default.keychain
-plutil -p default.keychain | grep -A6 "AirPlay Pairing Identity"
+plutil -p default.keychain | grep -A6 "AirPlay Pairing Identity" \
+  | grep -oE '[0-9a-fA-F]{64}\+[0-9a-fA-F]{64}' | cut -d+ -f2    # public half only
+rm default.keychain
 ```
 
 **Do not paste the private half, the certificate, or the keychain file into a repo, an issue, or a chat.** They are your unit's identity. If you publish your unit's values, someone can impersonate your car.
@@ -385,12 +387,12 @@ adb logcat -v time | grep CPBRIDGE_DIAG
 Expected progression:
 
 ```
-[a_rfcomm_connect] OK client-mode peer=...
-[b_link_sync] VERSION DETECT OK ... SYN/SYN-ACK EXCHANGED ... LINK RUNNING
-[d_session] RX msgId=0x1D00 ... IDENTIFICATION ACCEPTED (0x1D02)
-[e_auth] RequestAuthenticationCertificate (0xAA00) ... AUTH SUCCEEDED (0xAA05)
-[f_credentials] SENT 0x5703 ssid="..." channel=...
-[g_carplay] CarPlayAvailability (0x4300) ... SENT 0x4301 CarPlayStartSession
+[stage=a_rfcomm_connect] OK client-mode peer=...
+[stage=b_link_sync] VERSION DETECT OK ... SYN/SYN-ACK EXCHANGED ... LINK RUNNING
+[stage=d_session] RX msgId=0x1D00 ... IDENTIFICATION ACCEPTED (0x1D02)
+[stage=e_auth] RequestAuthenticationCertificate (0xAA00) ... AUTH SUCCEEDED (0xAA05)
+[stage=f_credentials] SENT 0x5703 ssid="..." channel=...
+[stage=g_carplay] CarPlayAvailability (0x4300) ... SENT 0x4301 CarPlayStartSession
 ```
 
 Then the iPhone drops Bluetooth, joins the hotspot, and the AirPlay session starts on port 7000. If you want more detail, the full session log survives link teardown:
@@ -442,7 +444,7 @@ Why, in order:
 3. The repo contains a replacement decoder (`audio/libAudioConverter.so`) that provides the five CoreAudio symbols the receiver's shim expects and decodes AAC-LC to 16-bit PCM through Android's MediaCodec. It was tested against the vendor shim on the unit and matches the ffmpeg reference to within about 66–70 dB SDR, decoding 1024-frame buffers correctly.
 4. It is **not verified in a real CarPlay session.** The test harness never opened an audio stream because no music was playing at the time, so the receiver never called the decoder. Deploying it also requires a boot hook that copies it into `/system/lib64` on every boot, because `/system` on this unit is ramdisk-backed and does not keep writes. The hook installation hit the `/vendor` corruption issue described above.
 
-So: the decoder exists and works in isolation, but nobody has heard wireless CarPlay audio come out of the car speakers, and the repo does not claim it. If you get further than I did, PRs welcome — the pieces are in `audio/` and `audio/`.
+So: the decoder exists and works in isolation, but nobody has heard wireless CarPlay audio come out of the car speakers, and the repo does not claim it. If you get further than I did, PRs welcome — the pieces are in `audio/`.
 
 Until then, if you want sound, plug in the cable. Wired CarPlay works fully.
 
@@ -482,7 +484,7 @@ Your unit isn't here? The prompt diagnoses it anyway. Add your results afterward
 
 ## How this was made
 
-I didn't write this by hand. A coding assistant did the diagnosis, the firmware reading, the wired enable, the screen app and the boot fixes, while I steered and tested in the car. The wireless bridge I built separately after that assistant declined to build it: the Bluetooth iAP2 bootstrap, the auth helper for the genuine chip, and the four fixes that finally made the session start. The prompt above is the reproducible version of the wired path. The wireless path is documented here as a manual procedure, because it is too risky and too unit-specific to hand to an assistant unattended.
+I didn't write this by hand. A coding assistant did the diagnosis, the firmware reading, the wired enable, the screen app and the boot fixes, while I steered and tested in the car. The wireless bridge I built separately after that: the Bluetooth iAP2 bootstrap, the auth helper for the genuine chip, and the four fixes that finally made the session start. The prompt above is the reproducible version of the wired path. The wireless path is documented here as a manual procedure, and the repo's skill only runs it step by step with you confirming each change, because it is too risky and too unit-specific to hand to an assistant unattended.
 
 ---
 
