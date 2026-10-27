@@ -9,6 +9,8 @@ ADB="adb"
 
 echo ">> restoring wired CarPlay changes"
 $ADB root >/dev/null 2>&1 || true
+# over TCP, `adb root` restarts adbd and drops the link: reconnect
+sleep 3; [ "${1:-}" ] && adb connect "$1" >/dev/null 2>&1 || true
 
 # carplay_on: back off
 $ADB shell settings put global carplay_on 0

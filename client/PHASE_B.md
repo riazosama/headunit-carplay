@@ -137,7 +137,7 @@ after both SDP-resolution and SDP-connect failures.
 | `persist.cpbridge.peer_mac` | unset | dial ONLY this Bluetooth MAC, e.g. `YOUR-IPHONE-BT-MAC` |
 | `persist.cpbridge.public_key` | unset | AirPlay public key for `0x4301`; unset = skip `0x4301` |
 | `persist.cpbridge.airplay_port` | `7000` | `0x4301` AirPlay port |
-| `persist.cpbridge.source_version` | `450.14.1` | `0x4301` source version |
+| `persist.cpbridge.source_version` | `320.17.3` | `0x4301` source version; must match the receiver's Bonjour `srcvers` |
 | `persist.cpbridge.ap_ip` | live `ip addr` of AP iface | wireless IP address list in `0x4301` |
 
 Compile-time switches in `Iap2Constants.java`: `AUTH_SKIP`,

@@ -181,9 +181,13 @@ final class Iap2Constants {
      */
     static final String EXTERNAL_ACCESSORY_PROTOCOL = "com.cpbridge.carplay";
 
-    /** CarPlayStartSession defaults (vendor field log: port 7000, srcVer 450.14.1). */
+    /**
+     * CarPlayStartSession defaults.  The source version must match the running
+     * receiver's Bonjour srcvers; 320.17.3 is the reference unit's (the older
+     * 450.14.1 from the vendor field log makes the receiver refuse the session).
+     */
     static final int CARPLAY_AIRPLAY_PORT = 7000;
-    static final String CARPLAY_SOURCE_VERSION = "450.14.1";
+    static final String CARPLAY_SOURCE_VERSION = "320.17.3";
 
     /**
      * 0x5703 parameter ids, from the interoperating DiPlay reference

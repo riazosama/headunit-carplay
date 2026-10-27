@@ -31,11 +31,24 @@ if [ -z "$WORK" ]; then
   exit 1
 fi
 
+# Only ever touch the head unit: never remount or reboot some other device.
+if [ "$("$ADB" -s "$WORK" shell getprop ro.atc.carplay.support | tr -d '\r')" != 1 ]; then
+  echo "$WORK is not an Autochips CarPlay unit; leaving it alone" >&2
+  exit 3
+fi
+
 echo "using $WORK"
+# adbd boots unprivileged (ro.secure=1); remount needs root, and over TCP
+# `adb root` restarts adbd, so reconnect before going on.
 "$ADB" -s "$WORK" root >/dev/null 2>&1
 sleep 3
 "$ADB" connect "$WORK" >/dev/null 2>&1 || true
 "$ADB" -s "$WORK" remount 2>&1 | tail -1
 "$ADB" -s "$WORK" shell 'sed -i "s/^ro.atc.carplay.wireless=1$/ro.atc.carplay.wireless=0/" /vendor/build.prop; sync; grep -n atc.carplay.wireless /vendor/build.prop'
+# Reboot only if the edit took; rebooting with =1 just brings the hotspot back.
+if ! "$ADB" -s "$WORK" shell 'grep -q "^ro.atc.carplay.wireless=0$" /vendor/build.prop'; then
+  echo "revert did NOT apply (no root yet, or /vendor still read-only); not rebooting" >&2
+  exit 1
+fi
 "$ADB" -s "$WORK" reboot
 echo "revert applied; the unit is rebooting into normal operation"

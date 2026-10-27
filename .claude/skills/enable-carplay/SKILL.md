@@ -90,20 +90,27 @@ package in a venv.
 ## Step 2 — Back up before any change
 
 Put backups in `backup/` (the repo `.gitignore` keeps it out of git — it holds device-specific
-values):
+values). Take them **once**: on a second run the unit already holds the changed values, and
+overwriting the first backup loses the originals.
 
 ```bash
-mkdir -p backup
-adb shell getprop > backup/getprop.backup.txt
-adb shell settings list global > backup/settings-global.backup.txt
-adb shell settings list system > backup/settings-system.backup.txt
-adb shell settings list secure > backup/settings-secure.backup.txt
-adb shell pm list packages > backup/packages.backup.txt
-adb pull /vendor/build.prop backup/vendor-build.prop   # wireless path needs this
+if [ -e backup/getprop.backup.txt ]; then
+  echo "backup/ already exists: keeping the original backup"
+else
+  mkdir -p backup
+  adb shell getprop > backup/getprop.backup.txt
+  adb shell settings list global > backup/settings-global.backup.txt
+  adb shell settings list system > backup/settings-system.backup.txt
+  adb shell settings list secure > backup/settings-secure.backup.txt
+  adb shell pm list packages > backup/packages.backup.txt
+  adb pull /vendor/build.prop backup/vendor-build.prop   # wireless path needs this
+fi
 ```
 
 `restore-wired.sh` reads `backup/getprop.backup.txt` to put the chip address back, and the
-wireless revert needs the `/vendor` backup if the edit has to be undone by hand.
+wireless revert needs the `/vendor` backup if the edit has to be undone by hand. If CarPlay was
+already changed before the first backup (or `backup/` is gone), tell the user the backup does not
+hold the factory values.
 
 ## Step 3 — Diagnose (both paths)
 
@@ -125,11 +132,13 @@ Find out what is actually wrong before touching anything, and report it to the u
    `/dev/i2c-*` buses (bus 6 on the reference unit).
    ```bash
    adb shell ls -l /dev/i2c-*
-   adb shell "command -v i2cdetect && i2cdetect -y -r 6"   # if i2c-tools is present
+   adb shell 'command -v i2cdetect && for i in 1 2 3 4 5; do i2cdetect -y -r 6; done'
    ```
    The MFi chip answers at a fixed 7-bit address (`0x10` on the reference unit — where the config
-   was wrongly set to `0x11`). An MFi chip can NACK its address while asleep, so run the probe
-   twice before concluding nothing is there. If `i2cdetect` is not on the unit, read the vendor CarPlay config
+   was wrongly set to `0x11`). It NACKs its address while asleep: on the reference unit two probes
+   in a row missed it and the next ones found it. So probe at least five times, and **a single
+   answer counts** as the chip being there. If bus 6 never answers, probe the other `/dev/i2c-*`
+   buses the same way before concluding there is no chip. If `i2cdetect` is not on the unit, read the vendor CarPlay config
    for the address it probes and watch `adb logcat` for MFi/auth errors while a phone is plugged
    in. **Do not assume `0x10`** — confirm it for this unit.
 4. **Is the on-screen CarPlay app installed?**
@@ -234,7 +243,7 @@ Do this once, with explicit user confirmation, and keep the unit on power:
 ```bash
 adb root
 adb remount
-adb pull /vendor/build.prop backup/vendor-build.prop
+[ -e backup/vendor-build.prop ] || adb pull /vendor/build.prop backup/vendor-build.prop  # keep the original
 adb shell 'sed -i "s/^ro.atc.carplay.wireless=0$/ro.atc.carplay.wireless=1/" /vendor/build.prop'
 adb shell 'sync; grep -n atc.carplay.wireless /vendor/build.prop'   # must say =1
 adb reboot
@@ -265,6 +274,17 @@ The AP IP is **not** reliably `192.168.43.1` — Android randomizes it each star
 locked out, power-cycle and catch the boot window; `./scripts/wireless-recovery.sh` waits for the
 unit and flips the property back.
 
+**If the unit is still on the home Wi-Fi after the reboot**, check for the hotspot interface:
+
+```bash
+adb shell 'getprop ro.atc.carplay.wireless; ip -o link show ap0'
+```
+
+`1` with no `ap0` means wireless mode is on but the hotspot is not up, and W4 cannot work: the
+bridge has no hotspot to hand the iPhone. The vendor service raises the hotspot at boot, and
+turning Bluetooth off stops it until the next boot. Make sure Bluetooth is on, reboot once and
+check again. If `ap0` is still missing, stop and report it. Do **not** edit `/vendor` again.
+
 ### W4 — Deploy the auth helper and the bridge, set this unit's values
 
 The hotspot only exists in wireless mode, so this is the first point where every value below can
@@ -280,6 +300,12 @@ adb shell /data/local/tmp/authd status
 adb install -r client/CarPlayBridge.apk
 ```
 
+If the install fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, the bridge already on the unit was
+signed with another key (`client/build.sh` makes a new `client/debug.keystore` when there is
+none). Ask, then `adb uninstall com.cpbridge` (a user app, not a system package; the
+`persist.cpbridge.*` values stay) and install again. Keep `client/debug.keystore` for later
+updates.
+
 The bridge ships with placeholders. Override every value with the unit's own, or it will
 authenticate and then silently fail to start the session.
 
@@ -288,11 +314,11 @@ authenticate and then silently fail to start the session.
 | Hotspot SSID / passphrase | Unit Settings → Hotspot; the user sets these two (below) | Wi-Fi credentials (`0x5703`) |
 | Hotspot channel | The channel the unit's AP actually runs on; pin it | Credentials, session request |
 | AP interface MAC | Read on the unit from `ap0` (not the BT MAC), below | BSSID / device ID |
-| Hotspot IP | Read on the unit from `ap0`, below; it changes on every hotspot start | Session request |
+| Hotspot IP | **Leave unset**: the bridge reads it live from `ap0` each session; it changes on every hotspot start | Session request |
 | Unit Bluetooth MAC | Read on the unit, below | Identification |
 | iPhone Bluetooth MAC | From the unit's bonded devices | Which phone the bridge dials |
 | AirPlay public key | Public half of the "AirPlay Pairing Identity" keychain item, below | Session request (`0x4301`) |
-| AirPlay source version | The version the running receiver reports (e.g. `320.17.3`) | Session request |
+| AirPlay source version | `srcvers` in the receiver's Bonjour record, below (`320.17.3` on the reference unit) | Session request |
 | AirPlay port | 7000 | Session request |
 
 Set the unit's own addresses on the unit itself, so they never pass through the conversation:
@@ -300,7 +326,7 @@ Set the unit's own addresses on the unit itself, so they never pass through the 
 ```bash
 adb shell 'setprop persist.cpbridge.bt_mac "$(settings get secure bluetooth_address)"'
 adb shell 'setprop persist.cpbridge.bssid "$(cat /sys/class/net/ap0/address)"'
-adb shell 'setprop persist.cpbridge.ap_ip "$(ip -4 addr show ap0 | grep -o "inet [0-9.]*" | cut -d" " -f2)"'
+adb shell 'setprop persist.cpbridge.ap_ip ""'   # unset: a pinned IP goes stale on the next hotspot start
 ```
 
 Ask the user to run these two in their own terminal, not through you:
@@ -315,12 +341,24 @@ The keychain holds the unit's private key next to the public one
 
 ```bash
 adb pull /data/vendor/carplay/default.keychain backup/
-plutil -p backup/default.keychain | grep -A6 "AirPlay Pairing Identity" \
-  | grep -oE '[0-9a-fA-F]{64}\+[0-9a-fA-F]{64}' | cut -d+ -f2    # public half only
+python3 -c 'import plistlib,sys; [print(i["kSecValueData"].decode().split("+")[1]) for i in plistlib.load(open(sys.argv[1],"rb")) if i.get("kSecAttrService")=="AirPlay Pairing Identity"]' \
+  backup/default.keychain    # public half only
 rm backup/default.keychain
 ```
 
-If that prints nothing, stop and ask; do not inspect the keychain to find out why.
+The key pair is stored as binary data, which `plutil -p` shows as hex bytes, so don't swap in a
+`plutil | grep`: it prints nothing. If the command above prints nothing, stop and ask; do not
+inspect the keychain to find out why.
+
+Read the receiver's AirPlay version from its Bonjour record, from a laptop on the same network
+as the unit (the hotspot, or the home Wi-Fi if the unit is still on it). Print only `srcvers`:
+the record also carries the unit's device ID.
+
+```bash
+dns-sd -B _airplay._tcp local.                                      # macOS: note the unit's name, Ctrl-C
+dns-sd -L "<UNIT-NAME>" _airplay._tcp local. | grep -o 'srcvers=[0-9.]*'   # Ctrl-C after it prints
+avahi-browse -rt _airplay._tcp | grep -o 'srcvers=[0-9.]*'           # Linux
+```
 
 The rest are not secrets:
 
@@ -383,10 +421,10 @@ Each failure looked identical — authentication succeeded, credentials went out
 cause was always one of these:
 
 1. **Device ID / BSSID must be the AP interface MAC** (`ip link show ap0`), not the Bluetooth MAC.
-2. **AirPlay source version must match the running receiver** — an old hardcoded value makes it
-   refuse the session.
+2. **AirPlay source version must match the running receiver** (`srcvers` from Bonjour) — an old
+   hardcoded value makes it refuse the session.
 3. **Hotspot IP must be read live** — Android randomizes the `192.168.43.x` address on every
-   hotspot start.
+   hotspot start. Keep `persist.cpbridge.ap_ip` empty so the bridge reads `ap0` itself.
 4. **Channel must be pinned** to the AP's real channel.
 
 ### W6 — Revert
@@ -428,3 +466,4 @@ when sound matters.
 - `authd/README.md` — MFi helper: what it does, how it talks to the chip, quirks.
 - `carplay-screen/` — the on-screen app; rebuild against the unit's framework if the APK fails.
 - `scripts/wireless-recovery.sh`, `scripts/wireless-revert.sh`, `restore-wired.sh` — undo paths.
+  `scripts/test-revert.sh` checks the wireless undo logic offline against a fake adb.
