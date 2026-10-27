@@ -28,6 +28,7 @@ If you just want working CarPlay with sound, use the wired path. The wireless pa
 | `scripts/` | Wireless revert / recovery helpers. |
 | `restore-wired.sh` | Undo the wired enable. |
 | `socials/` | The narrative write-up for posting. |
+| `.claude/skills/` | Agent skill (`enable-carplay`) that walks a coding assistant through the wired path, and the wireless path when the user asks for it. |
 
 Build outputs, keystores, keychains and device captures are gitignored and never committed.
 
@@ -57,6 +58,8 @@ adb shell 'getprop ro.boot.veritymode'       # disabled
 ### With a coding assistant
 
 Paste the prompt below into Claude Code (or another assistant with shell access) on a laptop that is on the car's Wi-Fi. Wired only — it does not touch wireless.
+
+The repo also ships an agent skill at `.claude/skills/enable-carplay/`. It follows the same procedure, asks before each change, and now covers the wireless path too — but only runs it when the user explicitly asks, because of the `/vendor` risk.
 
 ```
 I have an aftermarket Android head unit in my car. My model is: <UNIT NAME HERE>. Apple

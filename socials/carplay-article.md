@@ -2,6 +2,8 @@
 
 Turn on Apple CarPlay that your Android head unit already shipped with. Wired over USB, and wireless over Wi-Fi with two small helper apps. No new hardware.
 
+> Long-form write-up (the narrative version of the repo README). The condensed front page is [README.md](../README.md).
+
 **The story:** [link to your X thread]
 
 My Honda City's aftermarket screen never showed CarPlay. It turned out the unit (an Autochips AC8257 board) already had Apple's CarPlay software and a genuine Apple authentication chip inside. The vendor just shipped it half-finished and switched off. A coding assistant found it, and over one weekend wired CarPlay was working properly, with sound through the car speakers, opening by itself when I plug in.
@@ -14,13 +16,13 @@ This repo is the prompt, the tools, and the manual so you can check your own uni
 
 | Path | What it is |
 |---|---|
-| `client/` | The bridge app (`com.cpbridge`): Bluetooth iAP2 transport, identification, MFi auth client, Wi-Fi handoff, CarPlay session request. |
+| `carplay-screen/` | On-screen CarPlay app (`app.carplayscreen`): renders the CarPlay video, forwards touch. Needed for both paths. |
+| `client/` | Wireless bridge (`com.cpbridge`): Bluetooth iAP2 transport, identification, MFi auth client, Wi-Fi handoff, CarPlay session request. |
 | `authd/` | Root helper that lets the bridge use the unit's genuine Apple MFi chip for authentication. |
-| `audio/` | Replacement `libAudioConverter.so` decoder used by the wireless audio work (decodes AAC-LC; not yet verified in a live session). |
-| `scripts/` | Recovery helpers: catch the boot window and revert wireless mode. |
-| `client/PHASE_B.md` | Protocol and implementation notes from the wireless bridge work. |
-
-Not included: `app.carplayscreen`, the on-screen CarPlay app. The wired prompt builds one against your unit's own CarPlay interface.
+| `audio/` | Replacement `libAudioConverter.so` decoder (AAC-LC to PCM) for the wireless audio work; not yet verified in a live session. |
+| `scripts/` | Wireless revert / recovery helpers. |
+| `restore-wired.sh` | Undo the wired enable. |
+| `.claude/skills/` | Agent skill that walks a coding assistant through the wired and wireless paths. |
 
 ## What you get
 
@@ -140,7 +142,7 @@ adb shell setprop persist.carplay.i2c.slave_addr 16
 adb shell settings put global carplay_on 1
 
 # 4. Install the missing on-screen CarPlay app (built against the unit's own API)
-adb install CarPlay.apk
+adb install carplay-screen/CarPlay.apk
 ```
 
 Then plug in your iPhone. CarPlay comes up, with touch, Siri, and sound through the car speakers.
@@ -440,7 +442,7 @@ Why, in order:
 3. The repo contains a replacement decoder (`audio/libAudioConverter.so`) that provides the five CoreAudio symbols the receiver's shim expects and decodes AAC-LC to 16-bit PCM through Android's MediaCodec. It was tested against the vendor shim on the unit and matches the ffmpeg reference to within about 66–70 dB SDR, decoding 1024-frame buffers correctly.
 4. It is **not verified in a real CarPlay session.** The test harness never opened an audio stream because no music was playing at the time, so the receiver never called the decoder. Deploying it also requires a boot hook that copies it into `/system/lib64` on every boot, because `/system` on this unit is ramdisk-backed and does not keep writes. The hook installation hit the `/vendor` corruption issue described above.
 
-So: the decoder exists and works in isolation, but nobody has heard wireless CarPlay audio come out of the car speakers, and the repo does not claim it. If you get further than I did, PRs welcome — the pieces are in `audio/` and `audio/test/`.
+So: the decoder exists and works in isolation, but nobody has heard wireless CarPlay audio come out of the car speakers, and the repo does not claim it. If you get further than I did, PRs welcome — the pieces are in `audio/` and `audio/`.
 
 Until then, if you want sound, plug in the cable. Wired CarPlay works fully.
 
