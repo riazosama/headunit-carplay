@@ -1,0 +1,9 @@
+# build intermediates
+carplay-screen/build/
+
+# unit-specific secrets — NEVER commit these
+backup/
+*.keychain
+*vendor-build.prop*
+*.backup.txt
+*.log
