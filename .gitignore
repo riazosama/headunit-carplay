@@ -1,0 +1,33 @@
+# Build outputs
+carplay-screen/build/
+client/build/
+client/test/build/
+client/*.apk
+client/*.idsig
+client/debug.keystore
+authd/authd
+authd/cpauth_client
+
+# Device-specific material and secrets — NEVER commit
+backup/
+*vendor-build.prop*
+*.backup.txt
+*.keystore
+*.keychain
+*.key
+*.pem
+*.p12
+*.log
+*.raw
+*.aac
+*.so
+*.apk
+*.idsig
+*.class
+*.jar
+.DS_Store
+wireless-recovery.log
+
+# Exception: the wired screen app's signed APK is a deliverable, keep it
+!carplay-screen/CarPlay.apk
+!carplay-screen/CarPlay.apk.idsig
