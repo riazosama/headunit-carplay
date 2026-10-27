@@ -1,20 +1,16 @@
 ---
 name: enable-carplay
 description: >-
-  Enable Apple CarPlay that an aftermarket Android head unit already shipped with but left
-  switched off — wired over USB, and (experimental) wireless over Wi-Fi. Use this whenever
-  someone wants to turn on, fix, or get CarPlay working on an aftermarket Android car stereo or
-  head unit (Autochips AC8257 / BWIC "Yato1 A100" and similar rootable test-keys units), e.g.
-  "CarPlay doesn't show up on my head unit", "enable CarPlay on my Android car stereo", "my
-  aftermarket stereo says it supports CarPlay but it's disabled", "get Apple CarPlay working
-  over ADB", "wireless CarPlay doesn't work", "make CarPlay work over Wi-Fi with my iPhone". The
-  wired path backs up, finds the Apple MFi chip's real I2C address, switches CarPlay on, installs
-  the on-screen app and verifies with screenshots. The wireless path builds and installs the
-  Bluetooth iAP2 bridge (com.cpbridge) and the root MFi auth helper (authd), flips the vendor
-  wireless switch once, reconnects ADB through the unit's own hotspot, sets the per-unit values,
-  and verifies the handshake end to end. It only works on units that have the genuine Apple chip,
-  and it never forges or bypasses authentication. Always asks before each change and keeps a
-  restore path.
+  Enable Apple CarPlay on an aftermarket Android head unit (Autochips AC8257 / BWIC "Yato1 A100"
+  and similar rootable test-keys units) — wired over USB, and (experimental) wireless over Wi-Fi.
+  Use when someone wants to turn CarPlay on or fix it: "CarPlay doesn't show up", "enable CarPlay
+  on my Android car stereo", "get Apple CarPlay working over ADB", "wireless CarPlay doesn't
+  work", "make CarPlay work over Wi-Fi with my iPhone". Wired: back up, find the genuine MFi
+  chip's I2C address, switch CarPlay on, install the screen app, verify with screenshots.
+  Wireless (only on explicit request): build the Bluetooth iAP2 bridge and the root MFi auth
+  helper, flip the vendor switch once, reconnect ADB through the unit's hotspot, set the per-unit
+  values, verify the handshake. Uses the genuine chip; never forges authentication. Asks before
+  every change and keeps a restore path.
 ---
 
 # Enable Apple CarPlay on an Autochips head unit (wired or wireless)
