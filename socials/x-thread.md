@@ -1,6 +1,6 @@
 # X thread draft
 
-Before posting: make the repo public (it's private right now, so the link 404s for everyone else), and record a 15–20 second video of plugging the iPhone in and CarPlay popping up on the dash. Before/after is even better.
+Before posting: record a 15–20 second video of plugging the iPhone in and CarPlay popping up on the dash. Before/after is even better.
 
 ---
 
@@ -39,11 +39,11 @@ Touch, Siri, music through the car speakers. Opens by itself on plug-in. Fully r
 
 **5/**
 
-Wireless was harder. The unit had the receiver half but not the app that brings the iPhone in over Bluetooth.
+Wireless was harder. The unit had the receiver half, not the app that brings the iPhone in.
 
-So I built it: an iAP2 bridge, plus a helper that signs Apple's challenge with the unit's real chip. No forged auth.
+So I built it: an iAP2 bridge + a helper that signs Apple's challenge with the unit's real chip. No forged auth.
 
-Screen works. Sound still plays from the phone.
+Screen works. Sound, Siri and calls go via Bluetooth for now.
 
 **6/**
 
@@ -56,9 +56,9 @@ Root works and CarPlay shows up = you're where I was.
 
 **7/**
 
-It's all open source: the prompt to paste into Claude Code, the screen app, the wireless bridge, and a one-line restore.
+It's all open source: a Claude Code skill that does it for you (/enable-carplay), the screen app, the wireless bridge, and a one-line restore.
 
-github.com/riazosama/CarPlayAlreadyThere
+github.com/riazosama/headunit-carplay
 
 Try it on your unit and reply with the model. I'll add it to the supported list.
 
@@ -74,7 +74,7 @@ How many cars have CarPlay sitting one setting away right now?
 
 For quoting the Honda Civic head-unit post that's going around, and for replying under the big "I hacked my TV with Claude Code" posts. Attach the same video.
 
-> Same story with my Honda City's Android head unit, except Claude Code found Apple CarPlay already installed and switched off. Wrong chip address, missing screen app. Wired CarPlay works now. Prompt + repo in my thread.
+> Same story with my Honda City's Android head unit, except Claude Code found Apple CarPlay already installed and switched off. Wrong chip address, missing screen app. Wired CarPlay works now. Repo + Claude Code skill in my thread.
 
 ## Posting notes
 
@@ -82,6 +82,6 @@ For quoting the Honda Civic head-unit post that's going around, and for replying
 - Put the GitHub link in post 7, not post 1. X tends to show posts with external links to fewer people.
 - Say "Claude Code" in the first line. That's the phrase people are searching for this week.
 - Keep the villain accurate: the unit is aftermarket, so the vendor shipped it off, not Honda. Posts that blamed the carmaker got corrected in the replies.
-- Wireless audio doesn't work yet. Never imply it does.
+- Wireless sound, Siri and calls go through the car's Bluetooth (iPhone connected, head unit's source set to Bluetooth), not through CarPlay itself. Call it a workaround you're making seamless.
 - Post the Reddit version (reddit-post.md) the same day. The Honda Civic head-unit story reached X through r/ClaudeCode.
 - Reply to everyone in the first hour, especially people asking whether it works on their car. Point them to the two-minute check.
