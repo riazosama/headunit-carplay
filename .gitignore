@@ -1,9 +1,40 @@
-# build intermediates
+# Build outputs
 carplay-screen/build/
+client/build/
+client/test/build/
+client/*.apk
+client/*.idsig
+client/debug.keystore
+authd/authd
+authd/cpauth_client
+audio/libAudioConverter.so
+audio/test/test_audioconv
+audio/test/build/
+audio/test/assets/
+audio/test/out/
+audio/probe/probe_airplay_asbd
+audio/probe/probe_airplay_asbd2
 
-# unit-specific secrets — NEVER commit these
+# Device-specific material and secrets — NEVER commit
 backup/
-*.keychain
 *vendor-build.prop*
 *.backup.txt
+*.keystore
+*.keychain
+*.key
+*.pem
+*.p12
 *.log
+*.raw
+*.aac
+*.so
+*.apk
+*.idsig
+*.class
+*.jar
+.DS_Store
+wireless-recovery.log
+
+# Exception: the wired screen app's signed APK is a deliverable, keep it
+!carplay-screen/CarPlay.apk
+!carplay-screen/CarPlay.apk.idsig

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  CarPlay Bridge: supplies the missing com.autochips.carplayapp client for the
+  BWIC A100 (Autochips AC8257, Android 9).  It links against the vendor iAP2
+  HIDL HAL from the device boot classpath (/system/framework/autochips-framework.jar).
+
+  Phase A: launch activity probes the HAL, logs to CPBRIDGE_* and exits.
+  Phase B: BridgeService supplies the Bluetooth RFCOMM iAP2 transport and pushes
+           SoftAP credentials; started explicitly, never by Phase A.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.cpbridge"
+    android:versionCode="1"
+    android:versionName="1.0">
+
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application
+        android:label="CarPlay Bridge"
+        android:allowBackup="false"
+        android:debuggable="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="CarPlay Bridge">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".BridgeService"
+            android:exported="true"
+            android:label="CarPlay Bridge Service" />
+
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.DIRECT_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

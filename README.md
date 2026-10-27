@@ -10,6 +10,18 @@ Wireless was a longer road. The unit had the receiver half of wireless CarPlay b
 
 This repo is the prompt, the tools, and the manual so you can check your own unit and do the same.
 
+## What's in this repo
+
+| Path | What it is |
+|---|---|
+| `client/` | The bridge app (`com.cpbridge`): Bluetooth iAP2 transport, identification, MFi auth client, Wi-Fi handoff, CarPlay session request. |
+| `authd/` | Root helper that lets the bridge use the unit's genuine Apple MFi chip for authentication. |
+| `audio/` | Replacement `libAudioConverter.so` decoder used by the wireless audio work (decodes AAC-LC; not yet verified in a live session). |
+| `scripts/` | Recovery helpers: catch the boot window and revert wireless mode. |
+| `client/PHASE_B.md` | Protocol and implementation notes from the wireless bridge work. |
+
+Not included: `app.carplayscreen`, the on-screen CarPlay app. The wired prompt builds one against your unit's own CarPlay interface.
+
 ## What you get
 
 | | Wired (USB) | Wireless (Wi-Fi) |
@@ -324,7 +336,7 @@ adb shell true
 Two things that bite here:
 
 - **The AP IP is not reliably `192.168.43.1`.** Android picks a different `192.168.43.x` on each hotspot start. Read the gateway from your laptop, or read `ip addr` on the unit once connected.
-- **There is a boot window.** The unit reconnects to your home Wi-Fi for roughly 20–60 seconds at boot before the hotspot takes over. If the hotspot is up and the gateway trick is not working, power-cycle and catch ADB on your LAN during that window (`research/recovery/auto-revert.sh` does this and can flip the property back).
+- **There is a boot window.** The unit reconnects to your home Wi-Fi for roughly 20–60 seconds at boot before the hotspot takes over. If the hotspot is up and the gateway trick is not working, power-cycle and catch ADB on your LAN during that window (`scripts/wireless-recovery.sh` does this and can flip the property back).
 
 ## Step 5 — Deploy the auth helper and the bridge
 
@@ -428,7 +440,7 @@ Why, in order:
 3. The repo contains a replacement decoder (`audio/libAudioConverter.so`) that provides the five CoreAudio symbols the receiver's shim expects and decodes AAC-LC to 16-bit PCM through Android's MediaCodec. It was tested against the vendor shim on the unit and matches the ffmpeg reference to within about 66–70 dB SDR, decoding 1024-frame buffers correctly.
 4. It is **not verified in a real CarPlay session.** The test harness never opened an audio stream because no music was playing at the time, so the receiver never called the decoder. Deploying it also requires a boot hook that copies it into `/system/lib64` on every boot, because `/system` on this unit is ramdisk-backed and does not keep writes. The hook installation hit the `/vendor` corruption issue described above.
 
-So: the decoder exists and works in isolation, but nobody has heard wireless CarPlay audio come out of the car speakers, and the repo does not claim it. If you get further than I did, PRs welcome — the pieces are in `audio/` and `research/audio/`.
+So: the decoder exists and works in isolation, but nobody has heard wireless CarPlay audio come out of the car speakers, and the repo does not claim it. If you get further than I did, PRs welcome — the pieces are in `audio/` and `audio/test/`.
 
 Until then, if you want sound, plug in the cable. Wired CarPlay works fully.
 
@@ -443,7 +455,7 @@ adb shell 'sync; grep -n atc.carplay.wireless /vendor/build.prop'
 adb reboot
 ```
 
-If you are locked out of the hotspot, power-cycle and catch the boot window on your home Wi-Fi (`research/recovery/auto-revert.sh` automates it). Turning the unit's Bluetooth off also stops the hotspot, which can hand the Wi-Fi interface back to station mode.
+If you are locked out of the hotspot, power-cycle and catch the boot window on your home Wi-Fi (`scripts/wireless-recovery.sh` automates it). Turning the unit's Bluetooth off also stops the hotspot, which can hand the Wi-Fi interface back to station mode.
 
 After the revert you are on your home network again, normal wired CarPlay still works, and the wireless bridge simply never connects.
 
