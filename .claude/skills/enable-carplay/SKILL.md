@@ -139,6 +139,7 @@ Find out what is actually wrong before touching anything, and report it to the u
    It prints ` 10` and/or ` 11` for each address that answered. The chip NACKs its address while
    asleep (on the reference unit two probes in a row missed it), so it probes five times and
    **a single answer counts**. **Do not assume `0x10`** — confirm it for this unit.
+   (`enable-carplay.command` runs this same probe; change both together.)
    - `slave_addr` sets the address only; the vendor library opens bus 6 itself. If nothing
      answers there, check `adb shell ls /dev/i2c-*` and the Step 3.2 output for a bus property.
      Without one, stop and report: a chip on another bus cannot be fixed with an address.

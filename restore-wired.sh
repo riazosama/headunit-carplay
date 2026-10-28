@@ -12,10 +12,13 @@ A=("${ADB:-adb}"); [ "${1:-}" ] && A+=(-s "$1")
 B=${BACKUP:-backup}
 
 echo ">> restoring wired CarPlay changes"
+# over TCP: connect first (adb may have forgotten the unit since the enable),
+# and again after `adb root`, which restarts adbd and drops the link
+reconnect() { case "${1:-}" in *:*) "${A[0]}" connect "$1" >/dev/null 2>&1 || true ;; esac; }
+reconnect "${1:-}"
 "${A[@]}" root >/dev/null 2>&1 || true
-# over TCP, `adb root` restarts adbd and drops the link: reconnect
 sleep "${ROOT_WAIT:-3}"
-case "${1:-}" in *:*) "${A[0]}" connect "$1" >/dev/null 2>&1 || true ;; esac
+reconnect "${1:-}"
 
 if [ -f "$B/getprop.backup.txt" ]; then
   # chip address: the original value, or empty if it was never set
