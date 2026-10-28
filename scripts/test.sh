@@ -14,16 +14,22 @@ trap 'rm -rf "$T"' EXIT
 # settings/pm stubbed. Every call goes to $FAKE/calls, reboots to $FAKE/reboots,
 # /vendor writes to $FAKE/writes, device-side changes to $FAKE/log.
 # Per device: a `flaky` file holds how many head-unit probes drop first, a
-# `stuck` file makes sed -i writes not land.
+# `stuck` file makes sed -i writes not land, `fail-get`/`fail-put` files make
+# settings reads/writes fail, an `i2c` file is what i2cdetect prints.
 cat >"$T/stubs.sh" <<'EOF'
 getprop() { if [ $# = 0 ]; then cat "$D/props"; else sed -n "s/^\[$1\]: \[\(.*\)\]\$/\1/p" "$D/props"; fi; }
 setprop() { echo "setprop $*" >>"$FAKE/log"; }
-settings() { case $1 in list) cat "$D/settings-$2" 2>/dev/null || true ;; *) echo "settings $*" >>"$FAKE/log" ;; esac; }
+settings() { case $1 in
+  list) cat "$D/settings-$2" 2>/dev/null || true ;;
+  get) [ -e "$D/fail-get" ] && return 1; sed -n "s/^$3=//p" "$D/settings-$2" 2>/dev/null || true ;;
+  *) [ -e "$D/fail-put" ] && return 1; echo "settings $*" >>"$FAKE/log" ;;
+esac; }
 pm() { case $1 in list) cat "$D/packages" 2>/dev/null || true ;; *) echo "pm $*" >>"$FAKE/log" ;; esac; }
 cmd() { :; }
 id() { echo 0; }
 mount() { :; }
 sync() { :; }
+i2cdetect() { cat "$D/i2c" 2>/dev/null || true; }
 EOF
 cat >"$T/adb" <<'EOF'
 #!/bin/bash
@@ -33,7 +39,7 @@ echo "$S $*" >>"$FAKE/calls"
 case "$1" in
   devices) printf 'List of devices attached\n%s\n' "${FAKE_DEVICES:-}" ;;
   reboot) echo "$S" >>"$FAKE/reboots" ;;
-  pull) cp "$D$2" "$3" ;;
+  pull) exec cp "$D$2" "$3" ;;
   shell|exec-out)
     [ -d "$D" ] || exit 1
     shift; c="$*"   # adb joins its arguments into one device command
@@ -139,6 +145,49 @@ printf 'package:app.carplayscreen\n' >"$D/packages"
 "$REPO/restore-wired.sh" unit >/dev/null 2>&1; rc=$?
 check "restore clears never-set values and keeps a factory screen app" \
   [ "$rc:$(n log 'slave_addr $'):$(n log 'delete global carplay_on'):$(n log uninstall)" = 0:1:1:0 ]
+
+# --- enable-carplay.command ------------------------------------------------
+# unit <i2c row or ""> [slave_addr] [carplay_on] [package]: a CarPlay unit,
+# by default with the chip address wrongly 0x11 (17) and the switch off
+unit() {
+  reset; device unit:5555 "" ""; D="$T/dev/unit:5555"
+  printf '[persist.carplay.i2c.slave_addr]: [%s]\n' "${2:-17}" >>"$D/props"
+  printf 'carplay_on=%s\n' "${3:-0}" >"$D/settings-global"
+  printf 'package:com.autochips.carplay\n%s\n' "${4:-}" >"$D/packages"
+  [ -z "$1" ] || printf '%s\n' "$1" >"$D/i2c"
+}
+E() { printf '%s\n' "$1" | "$REPO/enable-carplay.command" unit:5555 2>&1; }
+
+unit "10: 10 -- "; E y >/dev/null; rc=$?; b=$([ -e "$T/backup/getprop.backup.txt" ] && echo y)
+check "enable backs up, installs the app, points at the probed chip, switches on" \
+  [ "$rc:$b:$(n calls 'install carplay-screen'):$(n log 'slave_addr 16$'):$(n log 'put global carplay_on 1')" = 0:y:1:1:1 ]
+
+unit "10: 10 -- "; E n >/dev/null; rc=$?
+check "enable changes nothing when the user says no" [ "$rc:$(n log):$(n calls install)" = 0:0:0 ]
+
+unit "10: 10 -- " 16 1 package:app.carplayscreen; E y >/dev/null; rc=$?
+check "enable leaves a unit that is already set up alone" [ "$rc:$(n log):$(n calls install)" = 0:0:0 ]
+
+unit ""; E y >/dev/null; rc=$?
+check "enable never guesses the address when the chip doesn't answer" \
+  [ "$rc:$(n log setprop):$(n log 'put global carplay_on 1')" = 0:0:1 ]
+
+unit "10: 10 11"; E y >/dev/null; rc=$?
+check "enable never guesses the address when both 0x10 and 0x11 answer" \
+  [ "$rc:$(n log setprop):$(n log 'put global carplay_on 1')" = 0:0:1 ]
+
+says() { printf '%s\n' "$out" | grep -c -- "$1"; }
+unit "10: 10 -- "; touch "$D/fail-put"; out=$(E y); rc=$?
+check "enable reports a half-done change once, with the undo" \
+  [ "$rc:$(n log 'slave_addr 16$'):$(says 'stopped'):$(says 'Undo what changed: cd .* && ./restore-wired.sh unit:5555')" = 1:1:1:1 ]
+
+unit "10: 10 -- "; touch "$D/fail-get"; out=$(E y); rc=$?
+check "enable reports a failed read once, before any change, without an undo" \
+  [ "$rc:$(n log):$(says 'stopped'):$(says Undo)" = 1:0:1:0 ]
+
+unit "10: 10 -- "; rm "$D/vendor/build.prop"; out=$(E y); rc=$?
+check "enable says plainly when the backup fails, and changes nothing" \
+  [ "$rc:$(n log):$(n calls install):$(says 'backup failed, so nothing was changed'):$(says 'stopped')" = 1:0:0:1:0 ]
 
 # --- bridge-log.sh -----------------------------------------------------------
 reset; device unit "" ""; L="$T/dev/unit/sdcard/Android/data/com.cpbridge/files"; mkdir -p "$L"

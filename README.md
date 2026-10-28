@@ -27,6 +27,7 @@ If you just want working CarPlay, use the wired path. The wireless path is exper
 | `client/` | Wireless bridge (`com.cpbridge`): Bluetooth iAP2 transport, identification, MFi auth client, Wi-Fi handoff, CarPlay session request. |
 | `authd/` | Root helper that lets the bridge use the unit's genuine Apple MFi chip for authentication. |
 | `scripts/` | Wireless on/off (`wireless-mode.sh`), boot-window recovery, a redacted bridge log, and offline tests against a fake adb. |
+| `enable-carplay.command` | One-click wired enable, no AI needed: double-click on a Mac, or run it in a terminal. |
 | `backup.sh` | Back up the unit's original values before any change. |
 | `restore-wired.sh` | Undo the wired enable from that backup. |
 | `docs/GUIDE.md` | The full step-by-step guide: wired, wireless, troubleshooting, revert. |
@@ -112,6 +113,17 @@ Rules
 - This prompt is wired only. Do not attempt the wireless path.
 - If anything is unclear, ask rather than guessing. Keep the restore script current.
 ```
+
+### One click (no AI subscription needed)
+
+1. Install ADB: `brew install android-platform-tools` on a Mac (the script offers to do it), `sudo apt install adb` on Linux, [platform-tools](https://developer.android.com/tools/releases/platform-tools) plus Git Bash on Windows.
+2. On the head unit: Settings → About → tap **Build number** 7 times, then turn on network/USB debugging in Developer options. Note its IP address.
+3. Download this repo (Code → Download ZIP), unzip it, and double-click **`enable-carplay.command`**. On Linux/Windows, run `./enable-carplay.command` from the repo folder.
+   If a Mac blocks it: on macOS 15 and later, open System Settings → Privacy & Security and click **Open Anyway** next to the message about it; on macOS 14 and earlier, right-click it → Open.
+4. Type the unit's IP when asked. The script checks root, backs up, finds the MFi chip, shows what it will change, and asks once before touching anything.
+5. Plug in your iPhone.
+
+Undo: in a terminal, `cd` into the repo folder, then `./restore-wired.sh <UNIT-IP>:5555`. The script prints this exact command when it finishes. Wired only — the script never touches wireless or `/vendor`.
 
 ### By hand
 
