@@ -33,8 +33,10 @@ once the user has asked for wireless and the wired path works on their unit.
 
 ## Rules
 
-- **Root-only.** Both paths need `adb root` on a debuggable (`userdebug` / AOSP test-keys)
-  build. If `adb root` is refused, stop — none of this applies.
+- **Root expected, by whatever route.** Both paths run commands as root on a debuggable
+  (`userdebug` / AOSP test-keys) build. `adb root` is only one way in: a refusal usually means
+  adbd cannot raise itself, not that the unit has no root. Step 1 also tries the vendor factory
+  command service (`cmdclient`) and `su`, then the part of the wired path that needs no root.
 - **Ask before every change**, work live on the device, and show the user a screenshot pulled
   from the unit after each one. The whole point is a change that stays reversible.
 - **Wired first; wired is the low-risk path, wireless is medium.** Do the wireless path only
@@ -64,14 +66,31 @@ once the user has asked for wireless and the wired path works on their unit.
   `carplay_on` switch, port 7000), not a guarantee. When a value doesn't match, ask and probe —
   don't guess.
 
+## When something blocks you
+
+The bullets above are the fixed lines — genuine chip, one `/vendor` write, no verity-off, no
+removals, secrets off the wire. Everything else is a default to steer around, so don't stop at
+the first "no". When a step blocks:
+
+1. **Re-check.** A wrong reading is the usual cause on this hardware: the MFi chip NACKs while
+   asleep, names differ between units. Probe again, and another way.
+2. **Find the safe route to the same result:** another bus, another property name, `cmdclient`
+   or `su` when `adb root` is refused, an off-the-shelf adapter instead of a firmware change.
+3. **Do the part that still works,** and say exactly what is left out.
+4. **Only then decline,** with what would unblock it and the options the user still has.
+
+A route is safe when it stays inside the fixed lines and can be undone. If the only way forward
+crosses one of them, say so and offer the alternatives instead.
+
 ## Choose the path
 
 | The user wants | Do this |
 |---|---|
 | CarPlay working, with the least risk | Wired only. |
 | Wireless CarPlay | Wired first (it proves the chip, the screen app and the vendor service), then [wireless.md](wireless.md). |
-| A locked unit / no root | Stop. Explain that this needs a debug build. |
-| A unit with no Apple MFi chip | Stop. Wireless is impossible and wired auth will fail. |
+| `adb root` refused | Not a dead end: Step 1 tries the vendor command service (`cmdclient`) and `su`, then the wired steps that need no root. |
+| No Apple MFi chip found | Re-probe every bus first (Step 3.3). If there really is none, offer a USB CarPlay adapter that carries its own Apple chip. |
+| A truly locked unit (no root route works) | Stop. Explain that this needs a debug build or a factory root switch. |
 
 ## Prerequisites
 
@@ -93,9 +112,36 @@ adb -s <UNIT-IP>:5555 root
 adb connect <UNIT-IP>:5555   # reconnect: adbd restarts after `adb root`
 ```
 
-Confirm `adb -s <UNIT-IP>:5555 shell id -u` prints `0`. If root is refused, stop — the unit is
-locked. Run `adb -s <UNIT-IP>:5555 shell getprop ro.adb.secure`; if it is `0`, warn the user (see
-**Network ADB gives root**). From here on, `<UNIT-IP>:5555` is the serial for `ANDROID_SERIAL`.
+Confirm `adb -s <UNIT-IP>:5555 shell id -u` prints `0`. From here on, `<UNIT-IP>:5555` is the
+serial for `ANDROID_SERIAL`. Run `adb shell getprop ro.adb.secure`; if it is `0`, warn the user
+(see **Network ADB gives root**).
+
+If `adb root` is refused, don't call the unit locked yet. Find another root route, and once one
+answers, use it wherever the rest of this skill says `adb root`:
+
+1. Build check: `adb shell getprop ro.build.type` and `ro.debuggable`.
+2. **Vendor factory command service.** Many of these units (Autochips included) ship a factory
+   helper that runs each command as root from the unprivileged shell:
+   ```bash
+   adb shell cmdclient "id"
+   ```
+   Root is confirmed when it prints `uid=0(root)` (context usually `u:r:cmd_services:s0`). Then
+   run root commands as `adb shell cmdclient "<command>"`. Mind its limits: one command per call
+   with a short length cap (≈127 chars on the reference unit), so keep each small — for anything
+   longer, write a short script to `/data/local/tmp` and have one call `sh` it. Root lasts for
+   that call only and does not survive a reboot, but re-arms on the next call, so nothing needs
+   re-enabling after a restart. To pull a root-only file, copy it to `/sdcard` through the
+   service first (`adb shell cmdclient "cp <path> /sdcard/x && chmod 666 /sdcard/x"`), then
+   `adb pull`. If `cmdclient` is absent, look for another factory/engineering tool:
+   `adb shell 'ls /system/bin /vendor/bin | grep -iE "cmd|factory|eng"'`.
+3. `su`: `adb shell 'command -v su && su -c id'` (or `su 0 id`). If it prints `uid=0`, run root
+   commands as `adb shell su -c '<command>'`.
+4. Ask the user to look in Developer options and the unit's factory settings for a root or
+   rooted-debugging switch (the factory code comes from the seller or the manual).
+5. With none of these, the shell user can still do most of the wired path: `settings put global
+   carplay_on 1`, `adb install` the screen app, and `adb logcat` while a phone is plugged in. The
+   I2C probe and the `persist.carplay.i2c.slave_addr` change need root; if the configured address
+   is already right, that can be enough. Wireless needs root throughout, so leave it out.
 
 macOS note: if adb reports "No route to host" while the port is open, that is macOS Local Network
 privacy, not the unit. Grant the terminal Local Network access, or use the Python `adb-shell`
@@ -140,8 +186,11 @@ Find out what is actually wrong before touching anything, and report it to the u
    asleep (on the reference unit two probes in a row missed it), so it probes five times and
    **a single answer counts**. **Do not assume `0x10`** — confirm it for this unit.
    - `slave_addr` sets the address only; the vendor library opens bus 6 itself. If nothing
-     answers there, check `adb shell ls /dev/i2c-*` and the Step 3.2 output for a bus property.
-     Without one, stop and report: a chip on another bus cannot be fixed with an address.
+     answers there, probe again (it NACKs while asleep), then check `adb shell ls /dev/i2c-*` and
+     the Step 3.2 output for a bus property. Without one, a chip on another bus cannot be reached
+     by changing the address: tell the user, and offer a USB CarPlay adapter that brings its own
+     Apple chip. If no bus answers at all, there is likely no chip — the adapter is then the way
+     to CarPlay on this unit.
    - If `i2cdetect` is not on the unit, read the vendor CarPlay config for the address it probes
      and watch `adb logcat` for MFi/auth errors while a phone is plugged in.
 4. **Is the on-screen CarPlay app installed?**

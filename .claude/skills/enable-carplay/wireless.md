@@ -33,8 +33,12 @@ adb shell 'grep -c "^ro.atc.carplay.wireless=" /vendor/build.prop; getprop ro.bu
   getprop ro.boot.veritymode; getprop ro.adb.secure; grep " /vendor " /proc/mounts'
 ```
 
-- `0` matching lines: this unit does not have the vendor wireless path. Stop; the bridge cannot
-  substitute for it.
+- `0` matching lines: the gate isn't in `/vendor/build.prop` under that name. Before ruling
+  wireless out, look elsewhere — `adb shell 'getprop | grep -iE "carplay.*(wireless|wifi)"'` and
+  the same grep over `/odm/build.prop /product/build.prop`. If a switch under another name turns
+  up, show the user and treat it as the W2 edit only with their explicit yes. If there is
+  genuinely none, the firmware has no wireless receiver and the bridge cannot substitute for it;
+  a wired-to-wireless CarPlay adapter on the USB port is the alternative.
 - `ro.build.type` must be `userdebug` or `eng`, and verity must not be enforcing. Never run
   `adb disable-verity`: it is another write on the `/vendor` side.
 
@@ -94,7 +98,10 @@ adb shell 'getprop ro.atc.carplay.wireless; ip link show ap0 >/dev/null 2>&1 && 
 `1` with `no-ap0` means wireless mode is on but the hotspot is not up, and W4 cannot work: the
 bridge has no hotspot to hand the iPhone. The vendor service raises the hotspot at boot, and
 turning Bluetooth off stops it until the next boot. Make sure Bluetooth is on, reboot once and
-check again. If `ap0` is still missing, stop and report it. Do **not** edit `/vendor` again.
+check again. If `ap0` is still missing, find out why before giving up: read
+`adb logcat -d | grep -iE "softap|hostapd|carplay"` for the vendor service's hotspot errors, and
+have the user turn the hotspot on once from Settings to see whether the radio can run an AP at
+all. Report what you find. Do **not** edit `/vendor` again.
 
 **Otherwise the unit has left the home network.** Have the user join the unit's AP from the
 laptop's Wi-Fi menu (the passphrase is on the unit under Settings → Hotspot), so the passphrase
