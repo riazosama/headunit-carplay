@@ -1,0 +1,5 @@
+# Bash scripts break with CRLF, which a Windows clone would give them by
+# default; .cmd files want CRLF. GitHub's Download ZIP follows this too.
+*.sh      text eol=lf
+*.command text eol=lf
+*.cmd     text eol=crlf

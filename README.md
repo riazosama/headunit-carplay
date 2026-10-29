@@ -116,14 +116,15 @@ Rules
 
 ### One click (no AI subscription needed)
 
-1. Install ADB: `brew install android-platform-tools` on a Mac (the script offers to do it), `sudo apt install adb` on Linux. On Windows, install [Git Bash](https://git-scm.com/download/win), then run `winget install Google.PlatformTools` in PowerShell and open a new window. Unzipping Google's platform-tools zip isn't enough: it doesn't add `adb` to PATH, so Windows says `adb` is not recognized.
+1. Install ADB: `brew install android-platform-tools` on a Mac (the script offers to do it), `sudo apt install adb` on Linux. On Windows, skip this: `enable-carplay.cmd` (step 3) installs Git for Windows and adb with winget, asking first.
 2. On the head unit: Settings → About → tap **Build number** 7 times, then turn on network/USB debugging in Developer options. Note its IP address.
-3. Download this repo (Code → Download ZIP), unzip it, and double-click **`enable-carplay.command`**. On Linux, run `./enable-carplay.command` from the repo folder. On Windows, right-click inside the repo folder → **Open Git Bash here**, then run `./enable-carplay.command` (not in PowerShell or Command Prompt).
+3. Download this repo (Code → Download ZIP), unzip it, and double-click **`enable-carplay.command`** on a Mac, or **`enable-carplay.cmd`** on Windows. On Linux, run `./enable-carplay.command` from the repo folder.
+   If Windows warns about it: click **More info → Run anyway** (or **Run**).
    If a Mac blocks it: on macOS 15 and later, open System Settings → Privacy & Security and click **Open Anyway** next to the message about it; on macOS 14 and earlier, right-click it → Open.
 4. Type the unit's IP when asked. The script checks root, backs up, finds the MFi chip, shows what it will change, and asks once before touching anything.
 5. Plug in your iPhone.
 
-Undo: in a terminal, `cd` into the repo folder, then `./restore-wired.sh <UNIT-IP>:5555`. The script prints this exact command when it finishes. Wired only — the script never touches wireless or `/vendor`.
+Undo: in a terminal (on Windows: right-click in the repo folder → **Open Git Bash here**), `cd` into the repo folder, then `./restore-wired.sh <UNIT-IP>:5555`. The script prints this exact command when it finishes. Wired only — the script never touches wireless or `/vendor`.
 
 Something went wrong? Every run is saved to `enable-carplay.log` in the repo folder. Send that file along with your issue.
 
