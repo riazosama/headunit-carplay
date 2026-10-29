@@ -116,9 +116,9 @@ Rules
 
 ### One click (no AI subscription needed)
 
-1. Install ADB: `brew install android-platform-tools` on a Mac (the script offers to do it), `sudo apt install adb` on Linux, [platform-tools](https://developer.android.com/tools/releases/platform-tools) plus Git Bash on Windows.
+1. Install ADB: `brew install android-platform-tools` on a Mac (the script offers to do it), `sudo apt install adb` on Linux. On Windows, install [Git Bash](https://git-scm.com/download/win), then run `winget install Google.PlatformTools` in PowerShell and open a new window. Unzipping Google's platform-tools zip isn't enough: it doesn't add `adb` to PATH, so Windows says `adb` is not recognized.
 2. On the head unit: Settings → About → tap **Build number** 7 times, then turn on network/USB debugging in Developer options. Note its IP address.
-3. Download this repo (Code → Download ZIP), unzip it, and double-click **`enable-carplay.command`**. On Linux/Windows, run `./enable-carplay.command` from the repo folder.
+3. Download this repo (Code → Download ZIP), unzip it, and double-click **`enable-carplay.command`**. On Linux, run `./enable-carplay.command` from the repo folder. On Windows, right-click inside the repo folder → **Open Git Bash here**, then run `./enable-carplay.command` (not in PowerShell or Command Prompt).
    If a Mac blocks it: on macOS 15 and later, open System Settings → Privacy & Security and click **Open Anyway** next to the message about it; on macOS 14 and earlier, right-click it → Open.
 4. Type the unit's IP when asked. The script checks root, backs up, finds the MFi chip, shows what it will change, and asks once before touching anything.
 5. Plug in your iPhone.
