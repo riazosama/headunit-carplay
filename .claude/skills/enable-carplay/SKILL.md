@@ -7,7 +7,8 @@ description: >-
   "enable CarPlay on my Android car stereo", "get Apple CarPlay working over ADB", "wireless
   CarPlay doesn't work", "make CarPlay work over Wi-Fi with my iPhone". Wired: back up, find the
   genuine MFi chip's I2C address, switch CarPlay on, install the screen app, verify with
-  screenshots. Wireless (only on explicit request): build the Bluetooth iAP2 bridge and the root
+  screenshots. Firmware without the stock receiver (seen on Android 11): install the DiPlay
+  receiver app and point it at the chip. Wireless (only on explicit request): build the Bluetooth iAP2 bridge and the root
   MFi auth helper, flip the vendor switch once, reconnect ADB through the unit's hotspot, set the
   per-unit values, verify the handshake. Uses the genuine chip; never forges authentication.
   Asks before every change and keeps a restore path.
@@ -20,20 +21,24 @@ relatives) already have Apple's CarPlay software and a **genuine Apple MFi authe
 on the board — but ship with CarPlay switched off, pointed at the wrong chip address, or missing
 the app that draws it. This skill turns CarPlay on live over ADB, using the hardware the unit
 already has. Nothing is forged or bypassed: the genuine chip performs Apple's authentication.
+Some firmware (seen on an Android 11 build of the same unit) has the chip but not the CarPlay
+software; there the skill installs DiPlay, a third-party receiver app, and points it at that chip.
 
-There are two paths, with very different risk:
+There are three paths, with very different risk:
 
 | Path | What works | Risk |
 |---|---|---|
 | **Wired (USB)** | Screen, touch, Siri, car audio, opens on plug-in | Low, fully reversible |
 | **Wireless (Wi-Fi)** | Screen, touch, opens on car start while `authd` is running; sound, Siri and calls via the car's Bluetooth (manual workaround) | Medium: one `/vendor` edit, unit leaves your network, unit-specific |
+| **Receiver app (DiPlay)**, only on firmware without the stock receiver | Wired and wireless, sound included (reported on one Android 11 unit) | Medium: third-party preview app; reversible, no `/vendor` write |
 
 This file covers the wired path. The wireless path is in [wireless.md](wireless.md): read it only
-once the user has asked for wireless and the wired path works on their unit.
+once the user has asked for wireless and the wired path works on their unit. The receiver-app
+path is in [receiver-app.md](receiver-app.md): read it only when Step 3.1 finds no stock receiver.
 
 ## Rules
 
-- **Root expected, by whatever route.** Both paths run commands as root on a debuggable
+- **Root expected, by whatever route.** Every path runs commands as root on a debuggable
   (`userdebug` / AOSP test-keys) build. `adb root` is only one way in: a refusal usually means
   adbd cannot raise itself, not that the unit has no root. Step 1 also tries the vendor factory
   command service (`cmdclient`) and `su`, then the part of the wired path that needs no root.
@@ -51,7 +56,8 @@ once the user has asked for wireless and the wired path works on their unit.
   recommend a strong hotspot password and turning network debugging off when they're done.
 - **Genuine chip only.** Never fabricate a certificate, replay a signature, or spoof MFi. If the
   unit has no Apple MFi chip, wireless cannot work and wired authentication will fail; stop and
-  say so.
+  say so. On DiPlay that means its `I2C` target only: never Local (an identity taken from
+  Carlinkit firmware, its default) or Remote (someone else's chip).
 - **Keep the unit's identity out of the conversation, the repo, logs and screenshots:** MFi
   certificate and serial, AirPlay pairing keychain, Bluetooth/Wi-Fi MAC addresses (the unit's
   and the iPhone's), hotspot SSID/passphrase, serial number. The commands here set those values
@@ -86,6 +92,7 @@ crosses one of them, say so and offer the alternatives instead.
 
 | The user wants | Do this |
 |---|---|
+| Any CarPlay, on firmware without the stock receiver (Step 3.1) | [receiver-app.md](receiver-app.md). The wired and wireless paths cannot work there. |
 | CarPlay working, with the least risk | Wired only. |
 | Wireless CarPlay | Wired first (it proves the chip, the screen app and the vendor service), then [wireless.md](wireless.md). |
 | `adb root` refused | Not a dead end: Step 1 tries the vendor command service (`cmdclient`) and `su`, then the wired steps that need no root. |
@@ -115,6 +122,19 @@ adb connect <UNIT-IP>:5555   # reconnect: adbd restarts after `adb root`
 Confirm `adb -s <UNIT-IP>:5555 shell id -u` prints `0`. From here on, `<UNIT-IP>:5555` is the
 serial for `ANDROID_SERIAL`. Run `adb shell getprop ro.adb.secure`; if it is `0`, warn the user
 (see **Network ADB gives root**).
+
+Android 11 units may offer only **Wireless debugging** (Developer options), which pairs with a
+code and listens on a random port, not 5555. The user reads the code and both ports off that
+screen. Pair once, then pin port 5555 so later steps and reboots find the unit:
+
+```bash
+adb pair <UNIT-IP>:<PAIRING-PORT>             # asks for the code shown on the unit
+adb connect <UNIT-IP>:<PORT>                  # the port on the Wireless debugging screen
+adb -s <UNIT-IP>:<PORT> root
+adb connect <UNIT-IP>:<PORT>                  # adbd restarted; the screen may show a new port
+adb -s <UNIT-IP>:<PORT> shell setprop persist.adb.tcp.port 5555
+adb -s <UNIT-IP>:<PORT> tcpip 5555 && adb connect <UNIT-IP>:5555
+```
 
 If `adb root` is refused, don't call the unit locked yet. Find another root route, and once one
 answers, use it wherever the rest of this skill says `adb root`:
@@ -163,11 +183,18 @@ unit holds the changed values. If CarPlay was already changed before the first b
 
 Find out what is actually wrong before touching anything, and report it to the user first.
 
-1. **Is CarPlay software present?**
+1. **Is CarPlay software present?** Same model name, different firmware: the Android 9 reference
+   unit has the stock receiver, an Android 11 build of it does not.
    ```bash
+   adb shell getprop ro.build.version.release
    adb shell pm list packages | grep -iE "carplay|autochips|airplay"
    adb shell ls /system/app /system/priv-app /vendor/app 2>/dev/null | grep -iE "carplay|autochips"
+   adb shell ls -l /system/framework/autochips_services_net.jar
    ```
+   No `com.autochips.carplay` package and no `autochips_services_net.jar` means the firmware has
+   no CarPlay receiver: nothing registers the `carplay_manager` service, so `app.carplayscreen`
+   logs `carplay binder is null`. Use [receiver-app.md](receiver-app.md) instead of Step 4, and
+   still do 3.3 and 3.5: it needs the chip, and the iPod service gets in its way.
 2. **What is CarPlay pointed at now?**
    ```bash
    adb shell getprop | grep -iE "carplay|i2c|mfi"
@@ -200,9 +227,18 @@ Find out what is actually wrong before touching anything, and report it to the u
    ```
    `app.carplayscreen` draws the CarPlay video and forwards touch. Without it, CarPlay can
    authenticate but nothing shows on screen. The repo ships `carplay-screen/CarPlay.apk`.
+5. **Does a stock iPod app claim the iPhone?**
+   ```bash
+   adb shell pm list packages | grep -E "com.bw.ipod"
+   adb logcat -c   # then have the user plug the iPhone in, and:
+   adb logcat -d | grep -E "IAPIPod|createIpod"
+   ```
+   On the Android 11 unit, `com.bw.ipodservice` caught the plug-in first and locked the iPhone
+   into iPod music mode (`[IAPIPod]` in logcat), so no CarPlay session could get the USB link.
 
-Summarise for the user: software present (y/n), current chip address vs. the real one, CarPlay
-switch state, screen app present (y/n). Only the mismatches need fixing.
+Summarise for the user: Android version, stock receiver present (y/n), current chip address vs.
+the real one, CarPlay switch state, screen app present (y/n), iPod service claiming the phone
+(y/n). Only the mismatches need fixing.
 
 ## Wired path
 
@@ -233,6 +269,16 @@ adb shell screencap -p /sdcard/cp.png && adb pull /sdcard/cp.png backup/
    the unit's own classes — see `carplay-screen/build.sh` and the API stubs under
    `carplay-screen/stubs/`. Only sign and install as a system app if the unit's test-keys build
    allows it.
+
+   On Android 10+, if `app.carplayscreen` crashes at launch with `NoSuchMethodError`, Android is
+   blocking the hidden CarPlay API it calls in `autochips.jar`. Allow it (`restore-wired.sh` puts
+   these back):
+   ```bash
+   adb shell settings put global hidden_api_policy 1
+   adb shell settings put global hidden_api_policy_pre_p_apps 1
+   adb shell settings put global hidden_api_policy_p_apps 1
+   ```
+   If it then logs `carplay binder is null`, the firmware has no stock receiver (Step 3.1).
 4. **Make it survive a reboot.** `persist.` props and `settings put global` survive reboots;
    confirm with `adb reboot`, reconnect (Step 1), and re-check the values from Step 3. This also
    proves network ADB comes back after a reboot, which the wireless path depends on.
@@ -251,6 +297,8 @@ the CarPlay switch from `backup/`, and removes the screen app unless the unit ca
 ## Reference
 
 - [wireless.md](wireless.md) — the wireless path (W0–W6).
+- [receiver-app.md](receiver-app.md) — DiPlay on firmware without the stock receiver (D1–D8).
+  [DiPlay](https://github.com/shihabal3amri/DiPlay)'s own `docs/INSTALL.md` covers its settings.
 - `README.md` — condensed overview, requirements, and the paste-in wired prompt.
 - `client/PHASE_B.md` — bridge implementation notes: wire format, stages, every
   `persist.cpbridge.*` value.

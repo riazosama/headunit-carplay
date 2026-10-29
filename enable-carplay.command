@@ -80,6 +80,9 @@ pkgs=$(run pm list packages)
 vendor=$(grep -iE 'carplay|autochips|airplay' <<<"$pkgs" | grep -v carplayscreen || true)
 echo "CarPlay packages:" $vendor >>"$LOG"
 app=$(grep -x 'package:app.carplayscreen' <<<"$pkgs" || true)
+# the stock receiver, as SKILL.md Step 3.1 checks it: Android 11 builds of this unit lack it
+recv=$(grep -x 'package:com.autochips.carplay' <<<"$pkgs" ||
+  run 'ls /system/framework/autochips_services_net.jar 2>/dev/null' || true)
 cur=$(run getprop persist.carplay.i2c.slave_addr)
 on=$(run settings get global carplay_on)
 # Same probe as SKILL.md Step 3.3: change both together. The chip NACKs while
@@ -97,12 +100,14 @@ case $probe in
 esac
 
 say "what I found"
-echo "   CarPlay software:     $([ -n "$vendor" ] && echo found || echo 'NOT found')"
+echo "   CarPlay receiver:     $([ -n "$recv" ] && echo found || echo 'NOT found')"
 echo "   MFi chip:             $chip"
 echo "   CarPlay chip address: ${cur:-unset}"
 echo "   CarPlay switch:       $([ "$on" = 1 ] && echo on || echo off)"
 echo "   Screen app:           $([ -n "$app" ] && echo installed || echo missing)"
-[ -n "$vendor" ] || echo "   !! No Apple CarPlay software matched; enabling may do nothing on this unit."
+[ -n "$recv" ] || die "this firmware has no CarPlay receiver (no com.autochips.carplay), as on
+   Android 11 builds of this unit, so switching CarPlay on can't help. Nothing was changed.
+   See 'Android 11 units' in the README: the skill can set up a receiver app instead."
 [[ $chip == 0x* ]] || echo "   !! Chip not confirmed: leaving the chip address as is."
 
 todo=()

@@ -23,7 +23,7 @@ If you just want working CarPlay, use the wired path. The wireless path is exper
 
 | Path | What it is |
 |---|---|
-| `carplay-screen/` | On-screen CarPlay app (`app.carplayscreen`) — renders the CarPlay video, forwards touch. Needed for both paths. |
+| `carplay-screen/` | On-screen CarPlay app (`app.carplayscreen`) — renders the CarPlay video, forwards touch. Needed for the wired and wireless paths. |
 | `client/` | Wireless bridge (`com.cpbridge`): Bluetooth iAP2 transport, identification, MFi auth client, Wi-Fi handoff, CarPlay session request. |
 | `authd/` | Root helper that lets the bridge use the unit's genuine Apple MFi chip for authentication. |
 | `scripts/` | Wireless on/off (`wireless-mode.sh`), boot-window recovery, a redacted bridge log, and offline tests against a fake adb. |
@@ -49,7 +49,7 @@ adb root                                                    # must succeed
 adb shell pm list packages | grep -iE "carplay|autochips|airplay"
 ```
 
-Root refused means the unit is locked and most of this won't apply. For wireless, also check:
+Root refused means the unit is locked and most of this won't apply. No `com.autochips.carplay` in that list means the firmware has no stock CarPlay receiver: see [Android 11 units](#android-11-units-no-stock-receiver). For wireless, also check:
 
 ```bash
 adb shell 'ls -l /dev/i2c-6'                 # i2c bus exists
@@ -165,6 +165,12 @@ Every wireless failure looked identical — auth succeeded, credentials sent, no
 3. **Hotspot IP must be read live** — Android randomizes the `192.168.43.x` address on every hotspot start.
 4. **Channel must be pinned** to the AP's real channel.
 
+## Android 11 units (no stock receiver)
+
+An Android 11 build of the same BWIC Yato1 A100 (`BWIC/Yato1/ac8257_64bit:11/RP1A.200720.011/mp1V8241`) has the MFi chip (bus 6, `0x10`) and the vendor iAP2 service, but not the CarPlay receiver (`com.autochips.carplay`, `autochips_services_net.jar`). `CarPlay.apk` then logs `carplay binder is null`, the wireless bridge has nothing to hand the iPhone to, and the one-click script stops without changing anything. A stock iPod service (`com.bw.ipodservice`) also grabs the iPhone on plug-in.
+
+What worked there is [DiPlay](https://github.com/shihabal3amri/DiPlay), a third-party CarPlay receiver app (wired and wireless, sound included), with the iPod service disabled. Point DiPlay at the unit's own chip: out of the box it signs with an identity taken from Carlinkit firmware, which this repo does not use. The skill covers the steps ([receiver-app.md](.claude/skills/enable-carplay/receiver-app.md)); `restore-wired.sh` undoes them.
+
 ## Supported units
 
 Add yours so the next person with the same unit skips the diagnosis (see [CONTRIBUTING.md](CONTRIBUTING.md)).
@@ -172,6 +178,7 @@ Add yours so the next person with the same unit skips the diagnosis (see [CONTRI
 | Unit | Build | Wired | Wireless |
 |---|---|---|---|
 | Autochips AC8257 (BWIC "Yato1 A100"), fitted in a Honda City | Android 9, `userdebug`, AOSP test keys, root over ADB | CarPlay, screen, touch, car audio, auto-open, boot persistence | Screen and touch work; sound, Siri and calls via the car's Bluetooth (workaround) |
+| Autochips AC8257 (BWIC "Yato1 A100") | Android 11 (`mp1V8241`), `userdebug`, AOSP test keys, root over ADB; no stock receiver | Through DiPlay (reported) | Through DiPlay over Wi-Fi Direct, with sound (reported) |
 
 Your unit isn't here? The prompt diagnoses it anyway. Add your results afterwards.
 
