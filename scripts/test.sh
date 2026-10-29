@@ -156,7 +156,8 @@ unit() {
   printf 'package:com.autochips.carplay\n%s\n' "${4:-}" >"$D/packages"
   [ -z "$1" ] || printf '%s\n' "$1" >"$D/i2c"
 }
-E() { printf '%s\n' "$1" | "$REPO/enable-carplay.command" unit:5555 2>&1; }
+E() { rm -f "$T/elog"; printf '%s\n' "$1" | LOG="$T/elog" "$REPO/enable-carplay.command" unit:5555 2>&1; }
+lg() { grep -c -- "$1" "$T/elog"; }
 
 unit "10: 10 -- "; E y >/dev/null; rc=$?; b=$([ -e "$T/backup/getprop.backup.txt" ] && echo y)
 check "enable backs up, installs the app, points at the probed chip, switches on" \
@@ -180,6 +181,8 @@ says() { printf '%s\n' "$out" | grep -c -- "$1"; }
 unit "10: 10 -- "; touch "$D/fail-put"; out=$(E y); rc=$?
 check "enable reports a half-done change once, with the undo" \
   [ "$rc:$(n log 'slave_addr 16$'):$(says 'stopped'):$(says 'Undo what changed: cd .* && ./restore-wired.sh unit:5555')" = 1:1:1:1 ]
+check "enable logs the run, the raw probe and the failure, and says where the log is" \
+  [ "$(lg '^== '):$(lg 'MFi chip: *0x10'):$(lg '^10: 10'):$(lg stopped):$(says "Log of this run: $T/elog")" = 1:1:5:1:1 ]
 
 unit "10: 10 -- "; touch "$D/fail-get"; out=$(E y); rc=$?
 check "enable reports a failed read once, before any change, without an undo" \

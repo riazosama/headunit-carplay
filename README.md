@@ -125,6 +125,8 @@ Rules
 
 Undo: in a terminal, `cd` into the repo folder, then `./restore-wired.sh <UNIT-IP>:5555`. The script prints this exact command when it finishes. Wired only — the script never touches wireless or `/vendor`.
 
+Something went wrong? Every run is saved to `enable-carplay.log` in the repo folder. Send that file along with your issue.
+
 ### By hand
 
 ```bash

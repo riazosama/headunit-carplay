@@ -11,6 +11,16 @@ set -Eeuo pipefail
 cd "$(dirname "$0")"
 export MSYS_NO_PATHCONV=1   # Git Bash would rewrite /vendor/... before adb sees it
 
+# Log every run next to this script, so a failed run can be sent as is: rerun
+# with the output going to both the screen and the log.
+export LOG=${LOG:-$PWD/enable-carplay.log}
+if [ -z "${LOGGING:-}" ]; then
+  printf '\n== %s | %s | bash %s\n' "$(date)" "$(uname -srm)" "$BASH_VERSION" >>"$LOG"
+  rc=0; LOGGING=1 "$BASH" "${0##*/}" "$@" 2>&1 | tee -a "$LOG" || rc=${PIPESTATUS[0]}
+  printf '\n   Log of this run: %s\n   Send that file if something went wrong.\n' "$LOG"
+  exit "$rc"
+fi
+
 undo=   # the undo command, once the unit has been changed
 stopped() {
   [ "$BASH_SUBSHELL" = 0 ] || return 0   # report once, from the main shell
@@ -36,19 +46,21 @@ if ! command -v "$ADB" >/dev/null; then
   fi
 fi
 
+"$ADB" version >>"$LOG" 2>&1 || true
+
 # 2. connect as root
 ip=${1:-}
 [ -n "$ip" ] || read -r -p "Head unit IP address (unit's Wi-Fi settings, or your router): " ip || true
 [ -n "$ip" ] || die "no IP address given"
 S=$ip; [[ $S == *:* ]] || S=$S:5555
 A=("$ADB" -s "$S")
-run() { "${A[@]}" shell "$@" 2>/dev/null | tr -d '\r'; }
+run() { "${A[@]}" shell "$@" 2>>"$LOG" | tr -d '\r'; }
 
 say "connecting to $S"
-"$ADB" connect "$S" >/dev/null 2>&1 || true
-"${A[@]}" root >/dev/null 2>&1 || true
+"$ADB" connect "$S" >>"$LOG" 2>&1 || true
+"${A[@]}" root >>"$LOG" 2>&1 || true
 sleep "${ROOT_WAIT:-3}"   # over Wi-Fi `adb root` restarts adbd and drops the link
-"$ADB" connect "$S" >/dev/null 2>&1 || true
+"$ADB" connect "$S" >>"$LOG" 2>&1 || true
 case $(run id -u || true) in
   0) ;;
   "") die "can't reach the unit at $S.
@@ -66,6 +78,7 @@ esac
 # 4. diagnose
 pkgs=$(run pm list packages)
 vendor=$(grep -iE 'carplay|autochips|airplay' <<<"$pkgs" | grep -v carplayscreen || true)
+echo "CarPlay packages:" $vendor >>"$LOG"
 app=$(grep -x 'package:app.carplayscreen' <<<"$pkgs" || true)
 cur=$(run getprop persist.carplay.i2c.slave_addr)
 on=$(run settings get global carplay_on)
@@ -74,7 +87,7 @@ on=$(run settings get global carplay_on)
 # ponytail: bus 6 only. The vendor library opens bus 6 itself, so a chip on
 # another bus can't be fixed with an address; the skill covers that case.
 probe=$(run 'command -v i2cdetect >/dev/null || { echo no-i2cdetect; exit; }
-  for i in 1 2 3 4 5; do i2cdetect -y -r 6 0x10 0x11; done' | grep -oE ' 1[01]|no-i2cdetect' | sort -u | tr -d ' ' || true)
+  for i in 1 2 3 4 5; do i2cdetect -y -r 6 0x10 0x11; done' | tee -a "$LOG" | grep -oE ' 1[01]|no-i2cdetect' | sort -u | tr -d ' ' || true)
 want=$cur   # never guess: without one clear answer, keep the address as is
 case $probe in
   10|11) want=$((16#$probe)) chip=0x$probe ;;
