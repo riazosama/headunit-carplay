@@ -7,7 +7,8 @@ change, keep the unit's identity out of the conversation, and name the device on
 The firmware ships the receiver half of wireless CarPlay (AirPlay receiver inside
 `com.autochips.carplay`, hotspot, `_airplay._tcp` on port 7000) but not the client that brings
 the iPhone in. `client/` + `authd/` supply it. Expect to debug: the per-unit values in W4 are the
-usual reason a session silently fails.
+usual reason a session silently fails. Firmware without that receiver (SKILL.md Step 3.1) cannot
+use this file; DiPlay's own wireless mode in [receiver-app.md](receiver-app.md) replaces it.
 
 Before starting, say clearly:
 

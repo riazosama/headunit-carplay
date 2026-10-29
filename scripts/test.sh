@@ -144,7 +144,14 @@ printf 'package:app.carplayscreen\n' >"$D/packages"
 "$REPO/backup.sh" unit >/dev/null 2>&1
 "$REPO/restore-wired.sh" unit >/dev/null 2>&1; rc=$?
 check "restore clears never-set values and keeps a factory screen app" \
-  [ "$rc:$(n log 'slave_addr $'):$(n log 'delete global carplay_on'):$(n log uninstall)" = 0:1:1:0 ]
+  [ "$rc:$(n log 'slave_addr $'):$(n log 'delete global carplay_on'):$(n log 'uninstall app.carplayscreen')" = 0:1:1:0 ]
+
+reset; device unit ro.atc.carplay.wireless=0 0; D="$T/dev/unit"
+printf 'enabled_accessibility_services=com.foo/.Svc\n' >"$D/settings-secure"
+"$REPO/backup.sh" unit >/dev/null 2>&1
+"$REPO/restore-wired.sh" unit >/dev/null 2>&1; rc=$?
+check "restore puts back the Android 11 settings and undoes the receiver-app path" \
+  [ "$rc:$(n log 'delete global hidden_api_policy$'):$(n log 'put secure enabled_accessibility_services com.foo/.Svc$'):$(n log 'delete secure accessibility_enabled'):$(n log 'uninstall com.shihab.diplay'):$(n log 'enable --user 0 com.bw.ipodservice')" = 0:1:1:1:1:1 ]
 
 # --- enable-carplay.command ------------------------------------------------
 # unit <i2c row or ""> [slave_addr] [carplay_on] [package]: a CarPlay unit,
@@ -191,6 +198,10 @@ check "enable reports a failed read once, before any change, without an undo" \
 unit "10: 10 -- "; rm "$D/vendor/build.prop"; out=$(E y); rc=$?
 check "enable says plainly when the backup fails, and changes nothing" \
   [ "$rc:$(n log):$(n calls install):$(says 'backup failed, so nothing was changed'):$(says 'stopped')" = 1:0:0:1:0 ]
+
+unit "10: 10 -- "; printf 'package:com.example\n' >"$D/packages"; out=$(E y); rc=$?
+check "enable stops before any change on firmware without the CarPlay receiver" \
+  [ "$rc:$(n log):$(n calls install):$(says 'no CarPlay receiver')" = 1:0:0:1 ]
 
 # --- bridge-log.sh -----------------------------------------------------------
 reset; device unit "" ""; L="$T/dev/unit/sdcard/Android/data/com.cpbridge/files"; mkdir -p "$L"
