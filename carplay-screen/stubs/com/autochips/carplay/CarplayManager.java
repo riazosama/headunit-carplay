@@ -24,4 +24,5 @@ public class CarplayManager {
     public int startVideo(Surface surface) { throw new RuntimeException("stub"); }
     public int stopVideo(boolean userSelect) { throw new RuntimeException("stub"); }
     public int updateTouchScreen(boolean press, int x, int y) { throw new RuntimeException("stub"); }
+    public int updateMedia(int mediaButtonIndex) { throw new RuntimeException("stub"); }
 }

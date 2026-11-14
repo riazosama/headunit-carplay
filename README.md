@@ -13,6 +13,7 @@ Turn on Apple CarPlay that an aftermarket **Autochips AC8257** Android head unit
 | Auto-open | On plug-in | On car start, while `authd` is running |
 | Audio through car speakers | Yes | Via the car's Bluetooth (workaround, below) |
 | Siri / calls | Yes | Via the car's Bluetooth (workaround, below) |
+| Steering wheel media controls | Yes (next/prev) | Yes (next/prev) |
 | Risk | Low, fully reversible | Medium: one `/vendor` edit, unit leaves your Wi-Fi, unit-specific |
 
 **Wireless sound is a workaround for now.** CarPlay's own audio doesn't come through the wireless session, because the bridge and the head unit's Bluetooth conflict. With the iPhone connected to the car's Bluetooth and the head unit's audio source set to Bluetooth, music, Siri and calls all play through the car speakers. It's a manual step, not CarPlay's native audio path. Making it seamless, like wired, is in progress.
@@ -177,7 +178,7 @@ Add yours so the next person with the same unit skips the diagnosis (see [CONTRI
 
 | Unit | Build | Wired | Wireless |
 |---|---|---|---|
-| Autochips AC8257 (BWIC "Yato1 A100"), fitted in a Honda City | Android 9, `userdebug`, AOSP test keys, root over ADB | CarPlay, screen, touch, car audio, auto-open, boot persistence | Screen and touch work; sound, Siri and calls via the car's Bluetooth (workaround) |
+| Autochips AC8257 (BWIC "Yato1 A100"), fitted in a Honda City | Android 9, `userdebug`, AOSP test keys, root over ADB | CarPlay, screen, touch, car audio, auto-open, boot persistence, steering wheel next/prev | Screen and touch work; sound, Siri and calls via the car's Bluetooth (workaround) |
 | Autochips AC8257 (BWIC "Yato1 A100") | Android 11 (`mp1V8241`), `userdebug`, AOSP test keys, root over ADB; no stock receiver | Through DiPlay (reported) | Through DiPlay over Wi-Fi Direct, with sound (reported) |
 
 Your unit isn't here? The prompt diagnoses it anyway. Add your results afterwards.
